@@ -52,6 +52,7 @@ def process_dataset():
     if embeddings:
         df = pd.DataFrame(embeddings, columns=["image_name"] + [f"dim_{i}" for i in range(len(embedding))])
         df.to_csv(save_path, index=False)
+        print(len(df.iloc[0, 1:].tolist()))  # Check the embedding dimension
         print(f"✅ Embeddings saved to {save_path}")
     else:
         print("\n❌ No valid embeddings found.")
