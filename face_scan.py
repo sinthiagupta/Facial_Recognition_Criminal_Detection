@@ -1,72 +1,63 @@
 import cv2
 import torch
-import numpy as np
-import os
 import pandas as pd
-from facenet_pytorch import MTCNN, InceptionResnetV1
 from PIL import Image
+from facenet_pytorch import MTCNN, InceptionResnetV1
+import os
 
-# Load FaceNet model
+# Initialize face detector and embedding model
 mtcnn = MTCNN(image_size=160, margin=0, keep_all=False)
-model = InceptionResnetV1(pretrained='vggface2').eval()
+resnet = InceptionResnetV1(pretrained='vggface2').eval()
 
-# Ensure embedding storage directory exists
-embedding_folder = "backend/user_embeddings"
-os.makedirs(embedding_folder, exist_ok=True)
+# Paths
+image_save_dir = "scanned_faces"
+embedding_save_path = "backend/user_embeddings/user_embedding.csv"
 
-# Capture video from the webcam
+# Ensure directories exist
+os.makedirs(image_save_dir, exist_ok=True)
+os.makedirs(os.path.dirname(embedding_save_path), exist_ok=True)
+
+# Start webcam
 cap = cv2.VideoCapture(0)
-print("📷 Press 's' to scan face | Press 'q' to quit")
-
-def generate_embedding(img_rgb):
-    """Generate face embedding from the captured image"""
-    try:
-        face = mtcnn(Image.fromarray(img_rgb))
-        if face is None:
-            print("❌ No face detected! Try again.")
-            return None
-        face = face.unsqueeze(0)
-        with torch.no_grad():
-            embedding = model(face)
-        return embedding.numpy().flatten()
-    except Exception as e:
-        print(f"⚠️ Error generating embedding: {e}")
-        return None
 
 while True:
     ret, frame = cap.read()
-    if not ret:
-        print("❌ Failed to capture image. Exiting...")
-        break
-
-    # Show camera feed
-    cv2.imshow("Face Scanner", frame)
-
-    # Wait for keypress
+    cv2.imshow("Press 's' to scan | 'q' to quit", frame)
+    
     key = cv2.waitKey(1) & 0xFF
-
-    if key == ord('s'):  # Press 's' to scan face
-        print("✅ Face captured!")
+    if key == ord('s'):  # Press 's' to capture
+        user_id = input("Enter user ID: ").strip()
+        image_path = f"{image_save_dir}/{user_id}.jpg"
+        
+        # Save the image
+        cv2.imwrite(image_path, frame)
+        print(f"✅ Image saved: {image_path}")
+        
+        # Convert to RGB and process embedding
         img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        embedding = generate_embedding(img_rgb)
+        img_pil = Image.fromarray(img_rgb)
+        face = mtcnn(img_pil)
 
-        if embedding is not None:
-            user_id = input("Enter a valid User ID: ").strip()  # Ensure valid input
-            if not user_id.isalnum():
-                print("❌ Invalid User ID. Please enter only letters and numbers.")
-                continue
+        if face is not None:
+            embedding = resnet(face.unsqueeze(0)).detach().numpy().flatten()
+            
+            # Convert to dataframe
+            df_new = pd.DataFrame([[image_path] + embedding.tolist()])
+            df_new.columns = ["image_name"] + [f"dim_{i}" for i in range(len(embedding))]
 
-            save_path = os.path.join(embedding_folder, f"{user_id}.csv")
-            df = pd.DataFrame([embedding])
-            df.to_csv(save_path, index=False)
-            print(f"✅ Face embedding saved for {user_id} at {save_path}")
+            # Append to CSV
+            if not os.path.exists(embedding_save_path):
+                df_new.to_csv(embedding_save_path, index=False)
+            else:
+                df_new.to_csv(embedding_save_path, mode='a', header=False, index=False)
 
-        break  # Exit after scanning
+            print("✅ Embedding saved in:", embedding_save_path)
+        else:
+            print("⚠ No face detected!")
 
-    elif key == ord('q'):  # Press 'q' to quit
-        print("🚪 Exiting scanner...")
+    elif key == ord('q'):  # Quit
         break
 
-# Release resources and close camera window
+# Release camera
 cap.release()
 cv2.destroyAllWindows()
