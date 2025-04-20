@@ -30,7 +30,7 @@ def get_face_embedding(img_path):
 
 def process_dataset():
     """ Process ANY dataset and save embeddings dynamically. """
-    dataset_path = "backend/processed_dataset"
+    dataset_path = "backend/augmented_dataset"
     # Ensure the embeddings directory exists
     os.makedirs("backend/embeddings", exist_ok=True)
 
