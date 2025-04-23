@@ -136,9 +136,50 @@ def upload_image():
         img_tk = ImageTk.PhotoImage(img)
         image_label.config(image=img_tk)
         image_label.image = img_tk
-
+        
 def enter_dataset():
-    messagebox.showinfo("Dataset Upload", "Upload functionality is integrated!")
+    # Ensure the backend dataset folder exists
+    dataset_folder = os.path.join(os.getcwd(), 'backend', 'dataset')
+    os.makedirs(dataset_folder, exist_ok=True)
+
+    # Ask whether the user wants to upload a folder or a single image
+    user_choice = messagebox.askquestion("Upload Type", "Do you want to upload a folder of images? Click 'No' to select a single image.")
+
+    if user_choice == 'yes':  # Folder upload
+        folder_path = filedialog.askdirectory()
+        if folder_path:
+            try:
+                image_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff')
+                image_files = [f for f in os.listdir(folder_path) if f.lower().endswith(image_extensions)]
+
+                if not image_files:
+                    messagebox.showwarning("No Images Found", "No image files found in the selected folder.")
+                    return
+
+                for image_name in image_files:
+                    src_path = os.path.join(folder_path, image_name)
+                    dest_path = os.path.join(dataset_folder, image_name)
+                    shutil.copy(src_path, dest_path)
+
+                messagebox.showinfo("Upload Success", f"{len(image_files)} image(s) uploaded to backend/dataset.")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to upload images. Error: {e}")
+        else:
+            messagebox.showwarning("No Folder Selected", "No folder was selected.")
+
+    else:  # Single file upload
+        file_path = filedialog.askopenfilename(filetypes=[("Image Files", "*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.tiff")])
+        if file_path:
+            try:
+                image_name = os.path.basename(file_path)
+                dest_path = os.path.join(dataset_folder, image_name)
+                shutil.copy(file_path, dest_path)
+
+                messagebox.showinfo("Upload Success", f"Image uploaded to backend/dataset:\n{image_name}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to upload image. Error: {e}")
+        else:
+            messagebox.showwarning("No File Selected", "No image file was selected.")
 
 def open_signup_window():
     signup_window = tk.Toplevel()
